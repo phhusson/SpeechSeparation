@@ -4,11 +4,14 @@ import torch
 import torchaudio
 from bsrnn import BSRNN
 import os
+import wandb
 
 sample_bases = '/home/phh/d/d/d4/dnr_v2'
 
 def samples(folder):
     s = [sample_bases + '/'+folder+'/' + x for x in os.listdir(sample_bases + '/' + folder)]
+    # Filter out files
+    s = [x for x in s if os.path.isdir(x)]
     s = [(x + '/mix.wav', x + '/speech.wav') for x in s]
     return s
 
@@ -29,7 +32,9 @@ class MyDataSet(torch.utils.data.Dataset):
         return load_waveform(self.samples[idx][0]), load_waveform(self.samples[idx][1])
 
 def main():
+    wandb.init()
     model = BSRNN().to("cuda")
+    wandb.watch(model)
     # List the folders  in $sample_bases / tr (every folder there is a train sample)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=1.0)
@@ -73,6 +78,7 @@ def main():
 
         optimizer.step()
         optimizer.zero_grad()
+        wandb.log({"train_loss": epochLoss / batchI})
 
         print("Epoch", epochI, "Loss", epochLoss / batchI, "lr", scheduler.get_last_lr())
         scheduler.step(epochLoss / batchI)
@@ -89,6 +95,7 @@ def main():
                 loss = l1loss(x, waveform_speech)
                 valLoss += loss
             print("Validation Loss", valLoss.item() / len(val))
+            wandb.log({"val_loss": valLoss.item() / len(val)})
 
         model.train()
 
