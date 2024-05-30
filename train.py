@@ -89,6 +89,9 @@ def main():
             valLoss = torch.tensor(0.0).to("cuda")
             for sample in val_loader:
                 waveform, waveform_speech = sample
+                waveform = waveform.squeeze(0)
+                waveform_speech = waveform_speech.squeeze(0)
+
                 # Forward the sample through the model
                 x = model.forward(waveform)
                 waveform_speech = waveform_speech[:, :x.shape[1]]
