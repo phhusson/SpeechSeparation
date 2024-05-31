@@ -19,7 +19,7 @@ def main():
     wandb.watch(model)
     # List the folders  in $sample_bases / tr (every folder there is a train sample)
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=1.0)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=10)
     l1loss = torch.nn.L1Loss()
 
