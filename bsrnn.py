@@ -55,7 +55,7 @@ class BandwiseLSTM(nn.Module):
 
     def forward(self, x: torch.Tensor):
         # X is [2; T; nBands; 128], we need [2 * T ; nBands; 128]
-        x = x.reshape( (x.shape[0] * x.shape[1], x.shape[2], x.shape[3]))
+        x = x.reshape((x.shape[0] * x.shape[1], x.shape[2], x.shape[3]))
 
         out = self.m(x)
         # out is [2 * T; nBands; 128]
@@ -79,25 +79,11 @@ class BSRNN(nn.Module):
             nn.Linear((1024 + 9) * 2, band_features)
         ])
 
-        # This is the LSTM over time. It takes as input the output of the bandFCs
-        # Which is a [T; 128 * nBands] tensor
-        # And outputs a [T; 128 * nBands] tensor
-        # Note that the paper recommends here a BiLSTM,
-        # but I want a LSTM so that the last samples don't suffer from edge effects
-        # timewise_{lstm.linear} is applied on each band
-        self.timewise_lstm = nn.LSTM(band_features, band_features, batch_first=True, num_layers=2)
-        self.timewise_linear = nn.Linear(band_features, band_features)
-
-        num_lstm_layers = 4
-
+        num_lstm_layers = 0
         self.lstms = nn.Sequential()
         for j in range(num_lstm_layers):
             self.lstms.append(BandwiseLSTM())
             self.lstms.append(TimewiseLSTM())
-
-        self.bandwise_lstm = nn.LSTM(band_features, band_features, batch_first=True, num_layers=2, bidirectional=True)
-        # 2x because of bidirectional
-        self.bandwise_linear = nn.Linear(2 * band_features, band_features)
 
         # Get back from the band features into full bands
         # Paper has hidden layer 512
