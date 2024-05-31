@@ -63,20 +63,25 @@ class BandwiseLSTM(nn.Module):
         out = out.reshape((2, -1, x.shape[1], x.shape[2]))
         return out
 
+def generate_bandsplits():
+    # Note: this splits in a logarithmic way, but maybe this makes the biggest bands too big
+    return [
+        8,
+        16,
+        32,
+        64,
+        128,
+        256,
+        512,
+        1024 + 9
+    ]
 
 class BSRNN(nn.Module):
     def __init__(self):
         super(BSRNN, self).__init__()
         # Take the STFT of each band, and output same sized-vector for each band
         self.bandFCs = nn.ModuleList([
-            nn.Linear(8 * 2, band_features),
-            nn.Linear(16 * 2, band_features),
-            nn.Linear(32 * 2, band_features),
-            nn.Linear(64 * 2, band_features),
-            nn.Linear(128 * 2, band_features),
-            nn.Linear(256 * 2, band_features),
-            nn.Linear(512 * 2, band_features),
-            nn.Linear((1024 + 9) * 2, band_features)
+            nn.Linear(x * 2, band_features) for x in generate_bandsplits()
         ])
 
         num_lstm_layers = 0
@@ -88,33 +93,13 @@ class BSRNN(nn.Module):
         # Get back from the band features into full bands
         # Paper has hidden layer 512
         mask_estimation_mlp_hidden = 512
-        self.bandFCs_back = nn.ModuleList([nn.Linear(band_features, mask_estimation_mlp_hidden) for _ in range(len(self.bandFCs))])
+        self.bandFCs_back = nn.ModuleList([
+            nn.Linear(band_features, mask_estimation_mlp_hidden) for _ in range(len(self.bandFCs))
+        ])
         self.bandFCs_back2 = nn.ModuleList([
-            nn.Linear(mask_estimation_mlp_hidden, 8 * 2 * 2),
-            nn.Linear(mask_estimation_mlp_hidden, 16 * 2 * 2),
-            nn.Linear(mask_estimation_mlp_hidden, 32 * 2 * 2),
-            nn.Linear(mask_estimation_mlp_hidden, 64 * 2 * 2),
-            nn.Linear(mask_estimation_mlp_hidden, 128 * 2 * 2),
-            nn.Linear(mask_estimation_mlp_hidden, 256 * 2 * 2),
-            nn.Linear(mask_estimation_mlp_hidden, 512 * 2 * 2),
-            nn.Linear(mask_estimation_mlp_hidden, (1024 + 9) * 2 * 2)
+            nn.Linear(mask_estimation_mlp_hidden, x * 2 * 2) for x in generate_bandsplits()
         ])
         self.bandFCs_back2_glu = nn.GLU()
-
-    @staticmethod
-    def generate_bandsplits():
-        # Note: this splits in a logarithmic way, but maybe this makes the biggest bands too big
-        return [
-            8,
-            16,
-            32,
-            64,
-            128,
-            256,
-            512,
-            1024 + 9
-        ]
-
 
     def forward(self, x):
         # Signal is 48kHz
@@ -128,9 +113,9 @@ class BSRNN(nn.Module):
         pshape("Input", x.shape)
         x = torch.stft(x, n_fft=4096, hop_length=512, return_complex=True, window=torch.hann_window(4096).to("cuda"))
 
-
         pshape("STFT", x.shape)
         # x is now [2; F; T/512] where F is the number of frequencies, here 2049
+        # From here on, we stop saying "T/512" but just T
         # We want to split the frequencies in bands
         bandsplit = self.generate_bandsplits()
         current_band_start = 0
