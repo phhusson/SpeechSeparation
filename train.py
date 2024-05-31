@@ -60,7 +60,7 @@ def main():
         optimizer.zero_grad()
         wandb.log({"train_loss": epochLoss / batchI, "train_sdr": epochSdr / batchI})
 
-        print("Epoch", epochI, "Loss", epochLoss / batchI, "lr", scheduler.get_last_lr(), "sdr", sdr / batchI)
+        print("Epoch", epochI, "Loss", epochLoss / batchI, "lr", scheduler.get_last_lr(), "sdr", epochSdr / batchI)
         scheduler.step(epochLoss / batchI)
         torch.save(model.state_dict(), "model.pth")
         epochI += 1
