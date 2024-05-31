@@ -20,7 +20,7 @@ class NormRNNResidual(nn.Module):
 
     def forward(self, x: torch.Tensor):
         out = x
-        out = out / out.norm()
+        out = out / torch.linalg.vector_norm(out)
         out = self.rnn(out)[0]
         out = self.fc(out)
         out = out + x
@@ -137,7 +137,7 @@ class BSRNN(nn.Module):
         bands = []
         for band in bandsplit:
             b = x[:, current_band_start:current_band_start + band, :]
-            b /= b.norm()
+            b /= torch.linalg.vector_norm(b)
             bands.append(b)
             current_band_start += band
 

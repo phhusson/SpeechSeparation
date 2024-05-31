@@ -78,7 +78,7 @@ def main():
             batchI += 1
             loss.backward()
             epochLoss += loss.item()
-            sdr += 10 * torch.log10(waveform_speech.item() / (loss.item() + 1e-9))
+            sdr += 10 * torch.log10(torch.linalg.vector_norm(waveform_speech, ord=1).item() / (loss.item() + 1e-9))
 
             if (batchI % 100) == 0:
                 optimizer.step()
