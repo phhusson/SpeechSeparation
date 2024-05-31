@@ -45,5 +45,5 @@ def train_infer(model, sample, lossfn, verbose=False):
 
     loss = lossfn(x, waveform_speech)
     sdr = 10 * torch.log10(
-        torch.linalg.vector_norm(waveform_speech, ord=1).detach() / (x.shape[1] * loss.item() + 1e-9))
+        torch.linalg.vector_norm(waveform_speech, ord=1) / (x.shape[1] * loss.item() + 1e-9))
     return loss, sdr
