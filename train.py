@@ -107,7 +107,7 @@ def main():
                 waveform_speech = waveform_speech[:, :x.shape[1]]
                 loss = l1loss(x, waveform_speech)
                 valLoss += loss.item()
-                valSdr += 10 * torch.log10(torch.linalg.vector_norm(waveform_speech.item(), ord=1) / (loss.item() + 1e-9))
+                valSdr += 10 * torch.log10(torch.linalg.vector_norm(waveform_speech, ord=1) / (loss.item() + 1e-9))
             print("Validation Loss", valLoss / len(val), "Validation SDR", valSdr / len(val))
             wandb.log({"val_loss": valLoss / len(val), "val_sdr": valSdr / len(val)})
 
