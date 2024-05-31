@@ -91,6 +91,7 @@ def main():
         print("Epoch", epochI, "Loss", epochLoss / batchI, "lr", scheduler.get_last_lr(), "sdr", sdr / batchI)
         scheduler.step(epochLoss / batchI)
         torch.save(model.state_dict(), "model.pth")
+        epochI += 1
 
         with torch.no_grad():
             model.eval()
@@ -106,7 +107,7 @@ def main():
                 waveform_speech = waveform_speech[:, :x.shape[1]]
                 loss = l1loss(x, waveform_speech)
                 valLoss += loss.item()
-                valSdr += 10 * torch.log10(waveform_speech.item() / (loss.item() + 1e-9))
+                valSdr += 10 * torch.log10(torch.linalg.vector_norm(waveform_speech.item(), ord=1) / (loss.item() + 1e-9))
             print("Validation Loss", valLoss / len(val), "Validation SDR", valSdr / len(val))
             wandb.log({"val_loss": valLoss / len(val), "val_sdr": valSdr / len(val)})
 
