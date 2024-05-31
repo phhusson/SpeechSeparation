@@ -63,6 +63,24 @@ class BandwiseLSTM(nn.Module):
         out = out.reshape((2, -1, x.shape[1], x.shape[2]))
         return out
 
+class BandwiseFC(nn.Module):
+    def __init__(self):
+        super(BandwiseFC, self).__init__()
+        nBands = len(generate_bandsplits())
+        self.fc1 = nn.Linear(band_features * nBands, band_features * nBands)
+        self.fc2 = nn.Linear(band_features * nBands, band_features * nBands)
+
+    def forward(self, x: torch.Tensor):
+        # X is [2; T; nBands; 128], we need [2 ; T ; nBands * 128]
+        out = x.reshape((x.shape[0], x.shape[1], -1))
+        out = self.fc1(out)
+        out = F.tanh(out)
+        out = self.fc2(out)
+        out = F.tanh(out)
+        # Reshape back to [2; T; nBands; 128]
+        out = out.reshape((2, x.shape[1], len(generate_bandsplits()), band_features))
+        return out
+
 def generate_bandsplits():
     # Note: this splits in a logarithmic way, but maybe this makes the biggest bands too big
     return [
@@ -84,10 +102,10 @@ class BSRNN(nn.Module):
             nn.Linear(x * 2, band_features) for x in generate_bandsplits()
         ])
 
-        num_lstm_layers = 0
+        num_lstm_layers = 2
         self.lstms = nn.Sequential()
         for j in range(num_lstm_layers):
-            self.lstms.append(BandwiseLSTM())
+            self.lstms.append(BandwiseFC())
             self.lstms.append(TimewiseLSTM())
 
         # Get back from the band features into full bands
