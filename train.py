@@ -71,16 +71,9 @@ def main():
             valSdr = 0.0
             for sample in val_loader:
                 loss, sdr = train_infer(model, sample, l1loss)
-                waveform, waveform_speech = sample
-                waveform = waveform.squeeze(0)
-                waveform_speech = waveform_speech.squeeze(0)
-
-                # Forward the sample through the model
-                x = model.forward(waveform)
-                waveform_speech = waveform_speech[:, :x.shape[1]]
-                loss = l1loss(x, waveform_speech)
                 valLoss += loss.item()
-                valSdr += 10 * torch.log10(torch.linalg.vector_norm(waveform_speech, ord=1) / (loss.item() + 1e-9))
+                valSdr += sdr.item()
+
             print("Validation Loss", valLoss / len(val), "Validation SDR", valSdr / len(val))
             wandb.log({"val_loss": valLoss / len(val), "val_sdr": valSdr / len(val)})
 
