@@ -27,19 +27,21 @@ class MyDataSet(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         return load_waveform(self.samples[idx][0]), load_waveform(self.samples[idx][1])
 
-
-def train_infer(model, sample, lossfn, verbose=False):
+def infer(model, sample):
     waveform, waveform_speech = sample
     waveform = waveform.squeeze(0)
     waveform_speech = waveform_speech.squeeze(0)
     x = model.forward(waveform)
     waveform_speech = waveform_speech[:, :x.shape[1]]
+    return x, waveform_speech
+
+def train_infer(model, sample, lossfn, verbose=False):
+    x, waveform_speech = infer(model, sample)
 
     if verbose:
         print("x", x.mean().item(), x.max().item(), x.std().item(), x.min().item())
         print("waveform_speech", waveform_speech.mean().item(), waveform_speech.max().item(),
               waveform_speech.std().item(), waveform_speech.min().item())
-        print(x.shape, "vs", waveform.shape)
 
     loss = lossfn(x, waveform_speech)
     sdr = 10 * torch.log10(
