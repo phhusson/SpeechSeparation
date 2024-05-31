@@ -71,9 +71,9 @@ def main():
             x = model.forward(waveform)
             waveform_speech = waveform_speech[:, :x.shape[1]]
             loss = l1loss(x, waveform_speech)
-            print("x", x.mean().item(), x.max().item(), x.std().item(), x.min().item())
-            print("waveform_speech", waveform_speech.mean().item(), waveform_speech.max().item(),
-                  waveform_speech.std().item(), waveform_speech.min().item())
+            #print("x", x.mean().item(), x.max().item(), x.std().item(), x.min().item())
+            #print("waveform_speech", waveform_speech.mean().item(), waveform_speech.max().item(),
+            #      waveform_speech.std().item(), waveform_speech.min().item())
             # print(x.shape, "vs", waveform.shape)
             batchI += 1
             loss.backward()
