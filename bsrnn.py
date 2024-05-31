@@ -135,7 +135,7 @@ class BSRNN(nn.Module):
         # x is now [2; F; T/512] where F is the number of frequencies, here 2049
         # From here on, we stop saying "T/512" but just T
         # We want to split the frequencies in bands
-        bandsplit = self.generate_bandsplits()
+        bandsplit = generate_bandsplits()
         current_band_start = 0
         bands = []
         for band in bandsplit:
