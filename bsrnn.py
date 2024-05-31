@@ -102,11 +102,11 @@ class BSRNN(nn.Module):
             nn.Linear(x * 2, band_features) for x in generate_bandsplits()
         ])
 
-        num_lstm_layers = 2
+        num_lstm_layers = 8
         self.lstms = nn.Sequential()
         for j in range(num_lstm_layers):
             self.lstms.append(BandwiseFC())
-            self.lstms.append(TimewiseLSTM())
+            #self.lstms.append(TimewiseLSTM())
 
         # Get back from the band features into full bands
         # Paper has hidden layer 512
