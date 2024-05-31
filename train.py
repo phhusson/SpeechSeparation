@@ -1,39 +1,17 @@
 #!/usr/bin/env python
 
 import torch
-import torchaudio
 from bsrnn import BSRNN
-import os
 import wandb
+import argparse
 
-sample_bases = '/home/phh/d/d/d4/dnr_v2'
+from m_dataset import samples, MyDataSet, train_infer
+from torch.utils.data import DataLoader
 
-
-def samples(folder):
-    s = [sample_bases + '/' + folder + '/' + x for x in os.listdir(sample_bases + '/' + folder)]
-    # Filter out files
-    s = [x for x in s if os.path.isdir(x)]
-    s = [(x + '/mix.wav', x + '/speech.wav') for x in s]
-    return s
-
-
-def load_waveform(path):
-    waveform, sample_rate = torchaudio.load(path)
-    if waveform.shape[0] == 1:
-        waveform = torch.cat((waveform, waveform), 0)
-    return waveform.to("cuda")
-
-
-class MyDataSet(torch.utils.data.Dataset):
-    def __init__(self, samples):
-        self.samples = samples
-
-    def __len__(self):
-        return len(self.samples)
-
-    def __getitem__(self, idx):
-        return load_waveform(self.samples[idx][0]), load_waveform(self.samples[idx][1])
-
+parser = argparse.ArgumentParser(description='Train a BSRNN model')
+parser.add_argument('--datapath', type=str, default='/home/phh/d/d/d4/dnr_v2', help='Path to the dataset')
+parser.add_argument('--mini', action='store_true', help='Use a small dataset')
+args = parser.parse_args()
 
 def main():
     wandb.init()
@@ -45,15 +23,19 @@ def main():
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=10)
     l1loss = torch.nn.L1Loss()
 
-    train = samples('tr')
+    train = samples(args.datapath, 'tr')
+    if args.mini:
+        train = train[:10]
     train = MyDataSet(train)
-    val = samples('cv')
+    val = samples(args.datapath, 'cv')
+    if args.mini:
+        val = val[:10]
     val = MyDataSet(val)
-    test = samples('tt')
+    test = samples(args.datapath, 'tt')
     test = MyDataSet(test)
 
-    train_loader = torch.utils.data.DataLoader(train, batch_size=1, shuffle=True)
-    val_loader = torch.utils.data.DataLoader(val, batch_size=1, shuffle=True)
+    train_loader = DataLoader(train, batch_size=1, shuffle=True)
+    val_loader = DataLoader(val, batch_size=1, shuffle=True)
 
     epochI = 0
     while True:
@@ -61,24 +43,14 @@ def main():
         batchI = 0
 
         epochLoss = 0.0
-        sdr = 0.0
+        epochSdr = 0.0
         for sample in train_loader:
-            waveform, waveform_speech = sample
-            waveform = waveform.squeeze(0)
-            waveform_speech = waveform_speech.squeeze(0)
-            # print(waveform.shape, waveform_speech.shape)
-            # Forward the sample through the model
-            x = model.forward(waveform)
-            waveform_speech = waveform_speech[:, :x.shape[1]]
-            loss = l1loss(x, waveform_speech)
-            #print("x", x.mean().item(), x.max().item(), x.std().item(), x.min().item())
-            #print("waveform_speech", waveform_speech.mean().item(), waveform_speech.max().item(),
-            #      waveform_speech.std().item(), waveform_speech.min().item())
-            # print(x.shape, "vs", waveform.shape)
+            loss, sdr = train_infer(model, sample, l1loss)
+
             batchI += 1
             loss.backward()
             epochLoss += loss.item()
-            sdr += 10 * torch.log10(torch.linalg.vector_norm(waveform_speech, ord=1).detach() / (x.shape[1] * loss.item() + 1e-9))
+            epochSdr += sdr.item()
 
             if (batchI % 100) == 0:
                 optimizer.step()
@@ -86,7 +58,7 @@ def main():
 
         optimizer.step()
         optimizer.zero_grad()
-        wandb.log({"train_loss": epochLoss / batchI, "train_sdr": sdr / batchI})
+        wandb.log({"train_loss": epochLoss / batchI, "train_sdr": epochSdr / batchI})
 
         print("Epoch", epochI, "Loss", epochLoss / batchI, "lr", scheduler.get_last_lr(), "sdr", sdr / batchI)
         scheduler.step(epochLoss / batchI)
@@ -98,6 +70,7 @@ def main():
             valLoss = 0.0
             valSdr = 0.0
             for sample in val_loader:
+                loss, sdr = train_infer(model, sample, l1loss)
                 waveform, waveform_speech = sample
                 waveform = waveform.squeeze(0)
                 waveform_speech = waveform_speech.squeeze(0)
