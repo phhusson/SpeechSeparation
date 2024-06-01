@@ -48,8 +48,7 @@ def main():
             loss, sdr = train_infer(model, sample, l1loss)
 
             batchI += 1
-            toBackward = -sdr
-            toBackward.backward()
+            loss.backward()
             epochLoss += loss.item()
             epochSdr += sdr.item()
 
