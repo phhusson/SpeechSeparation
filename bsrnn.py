@@ -102,11 +102,11 @@ class BSRNN(nn.Module):
             nn.Linear(x * 2, band_features) for x in generate_bandsplits()
         ])
 
-        num_lstm_layers = 8
+        num_lstm_layers = 2
         self.lstms = nn.Sequential()
         for j in range(num_lstm_layers):
             self.lstms.append(BandwiseFC())
-            #self.lstms.append(TimewiseLSTM())
+            self.lstms.append(TimewiseLSTM())
 
         # Get back from the band features into full bands
         # Paper has hidden layer 512
@@ -114,6 +114,7 @@ class BSRNN(nn.Module):
         self.bandFCs_back = nn.ModuleList([
             nn.Linear(band_features, mask_estimation_mlp_hidden) for _ in range(len(self.bandFCs))
         ])
+        self.bandFCs_back_prelu = nn.ModuleList([nn.PReLU() for _ in range(len(self.bandFCs))])
         self.bandFCs_back2 = nn.ModuleList([
             nn.Linear(mask_estimation_mlp_hidden, x * 2 * 2) for x in generate_bandsplits()
         ])
@@ -165,7 +166,7 @@ class BSRNN(nn.Module):
         for i, ogBandFc in enumerate(self.bandFCs):
             band = bands_with_time_and_bands[:, :, i, :]
             band = self.bandFCs_back[i](band)
-            band = F.tanh(band)
+            band = self.bandFCs_back_prelu[i](band)
             band = self.bandFCs_back2[i](band)
             band = self.bandFCs_back2_glu(band)
             pshape("Band back pre", i, band.shape)
