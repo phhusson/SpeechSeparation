@@ -10,17 +10,18 @@ def pshape(*args):
     #print(*args)
 
 
+# Takes as input [C; A; B] and outputs [C; A; B]; where C are ignored, A is
 band_features = 64
 class NormRNNResidual(nn.Module):
     def __init__(self):
         super(NormRNNResidual, self).__init__()
-        self.groupnorm = nn.GroupNorm(band_features, band_features)
+        self.groupnorm = nn.InstanceNorm1d(band_features)
         self.rnn = nn.LSTM(band_features, band_features, batch_first=True, num_layers=2)
         self.fc = nn.Linear(band_features, band_features)
 
     def forward(self, x: torch.Tensor):
         out = x
-        out = out / torch.linalg.vector_norm(out)
+        out = self.groupnorm(out.permute((0, 2, 1))).permute((0, 2, 1))
         out = self.rnn(out)[0]
         out = self.fc(out)
         out = out + x

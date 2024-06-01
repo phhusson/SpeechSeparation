@@ -4,7 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="db4d3c39-1fce-4952-9034-12b8faa5e5d9" name="Changes" comment="" />
+    <list default="true" id="db4d3c39-1fce-4952-9034-12b8faa5e5d9" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/bsrnn.py" beforeDir="false" afterPath="$PROJECT_DIR$/bsrnn.py" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -59,7 +62,7 @@
       <option name="presentableId" value="Default" />
       <updated>1717096564370</updated>
       <workItem from="1717096565932" duration="1000" />
-      <workItem from="1717096604662" duration="32723000" />
+      <workItem from="1717096604662" duration="33780000" />
     </task>
     <servers />
   </component>
