@@ -53,9 +53,8 @@ def main():
             epochLoss += loss.item()
             epochSdr += sdr.item()
 
-            if (batchI % 100) == 0:
-                optimizer.step()
-                optimizer.zero_grad()
+            optimizer.step()
+            optimizer.zero_grad()
 
         optimizer.step()
         optimizer.zero_grad()
