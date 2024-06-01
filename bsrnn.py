@@ -103,7 +103,7 @@ def generate_bandsplits():
         (250, 750),
         (500, 1000),
     ]
-    v = [v[0] for x in v]
+    v = [x[0] for x in v]
     return v + [2049 - sum(v)]
 
 class BSRNN(nn.Module):
