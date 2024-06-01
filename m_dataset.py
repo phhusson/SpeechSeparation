@@ -42,8 +42,10 @@ def train_infer(model, sample, lossfn, verbose=False):
         print("x", x.mean().item(), x.max().item(), x.std().item(), x.min().item())
         print("waveform_speech", waveform_speech.mean().item(), waveform_speech.max().item(),
               waveform_speech.std().item(), waveform_speech.min().item())
+    ftx = torch.stft(x, n_fft=4096, hop_length = 4096, return_complex=True, window=torch.hann_window(4096).to("cuda"))
+    fts = torch.stft(waveform_speech, n_fft=4096, hop_length = 4096, return_complex=True, window=torch.hann_window(4096).to("cuda"))
 
-    loss = lossfn(x, waveform_speech)
-    sdr = 10 * torch.log10(
-        torch.linalg.vector_norm(waveform_speech, ord=1) / (x.shape[1] * loss + 1e-9))
-    return loss, sdr
+    loss = lossfn(x, waveform_speech) + lossfn(ftx.real, fts.real) + lossfn(ftx.imag, fts.imag)
+    n2Source = torch.sum(torch.square(waveform_speech), dim=1)
+    n2Delta = torch.sum(torch.square(x - waveform_speech), dim=1)
+    return loss, 10 * torch.log10(n2Source / n2Delta)

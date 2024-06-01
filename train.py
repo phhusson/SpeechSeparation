@@ -21,7 +21,7 @@ def main():
 
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=10)
-    l1loss = torch.nn.L1Loss()
+    l1loss = torch.nn.L1Loss(reduction='mean')
 
     train = samples(args.datapath, 'tr')
     if args.mini:
