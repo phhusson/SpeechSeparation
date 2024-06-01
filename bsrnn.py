@@ -70,6 +70,7 @@ class BandwiseFC(nn.Module):
         nBands = len(generate_bandsplits())
         self.fc1 = nn.Linear(band_features * nBands, band_features * nBands)
         self.fc2 = nn.Linear(band_features * nBands, band_features * nBands)
+        self.fc3 = nn.Linear(band_features * nBands, band_features * nBands)
 
     def forward(self, x: torch.Tensor):
         # X is [2; T; nBands; 128], we need [2 ; T ; nBands * 128]
@@ -78,6 +79,7 @@ class BandwiseFC(nn.Module):
         out = F.tanh(out)
         out = self.fc2(out)
         out = F.tanh(out)
+        out = self.fc3(out)
         # Reshape back to [2; T; nBands; 128]
         out = out.reshape((2, x.shape[1], len(generate_bandsplits()), band_features))
         return out
@@ -111,7 +113,11 @@ class BSRNN(nn.Module):
         super(BSRNN, self).__init__()
         # Take the STFT of each band, and output same sized-vector for each band
         self.bandFCs = nn.ModuleList([
-            nn.Linear(x * 2, band_features) for x in generate_bandsplits()
+            nn.Sequential(
+                nn.Linear(x * 2, band_features),
+                nn.PReLU(),
+                nn.Linear(band_features, band_features),
+            ) for x in generate_bandsplits()
         ])
 
         num_lstm_layers = 2
@@ -124,13 +130,12 @@ class BSRNN(nn.Module):
         # Paper has hidden layer 512
         mask_estimation_mlp_hidden = 512
         self.bandFCs_back = nn.ModuleList([
-            nn.Linear(band_features, mask_estimation_mlp_hidden) for _ in range(len(self.bandFCs))
-        ])
-        self.bandFCs_back_prelu = nn.ModuleList([nn.PReLU() for _ in range(len(self.bandFCs))])
-        self.bandFCs_back2 = nn.ModuleList([
-            nn.Linear(mask_estimation_mlp_hidden, x * 2 * 2) for x in generate_bandsplits()
-        ])
-        self.bandFCs_back2_glu = nn.GLU()
+            nn.Sequential(
+                nn.Linear(band_features, mask_estimation_mlp_hidden),
+                nn.PReLU(),
+                nn.Linear(mask_estimation_mlp_hidden, x * 2 * 2),
+                nn.GLU(),
+            ) for x in generate_bandsplits()])
 
     def forward(self, x):
         # Signal is 48kHz
@@ -178,9 +183,6 @@ class BSRNN(nn.Module):
         for i, ogBandFc in enumerate(self.bandFCs):
             band = bands_with_time_and_bands[:, :, i, :]
             band = self.bandFCs_back[i](band)
-            band = self.bandFCs_back_prelu[i](band)
-            band = self.bandFCs_back2[i](band)
-            band = self.bandFCs_back2_glu(band)
             pshape("Band back pre", i, band.shape)
             # band is [2; T; <filter size * 2>], we want to split it back into real and imaginary parts
             band = band.reshape((2, -1, 2, band.shape[2] // 2))
