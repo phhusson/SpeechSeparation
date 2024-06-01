@@ -48,4 +48,6 @@ def train_infer(model, sample, lossfn, verbose=False):
     loss = lossfn(x, waveform_speech) + lossfn(ftx.real, fts.real) + lossfn(ftx.imag, fts.imag)
     n2Source = torch.sum(torch.square(waveform_speech), dim=1)
     n2Delta = torch.sum(torch.square(x - waveform_speech), dim=1)
-    return loss, 10 * torch.log10(n2Source / n2Delta)
+    sdr = 10 * torch.log10(n2Source / n2Delta)
+    sdr = sdr.mean()
+    return loss, sdr
