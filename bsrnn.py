@@ -83,16 +83,27 @@ class BandwiseFC(nn.Module):
 
 def generate_bandsplits():
     # Note: this splits in a logarithmic way, but maybe this makes the biggest bands too big
-    return [
-        8,
-        16,
-        32,
-        64,
-        128,
-        256,
-        512,
-        1024 + 9
+    v = [
+        (10, 0),
+        (10, 10),
+        (10, 20),
+        (10, 30),
+        (10, 40),
+        (10, 50),
+        (20, 60),
+        (20, 80),
+        (50, 100),
+        (50, 150),
+        (50, 200),
+        (50, 250),
+        (100, 300),
+        (100, 400),
+        (250, 500),
+        (250, 750),
+        (500, 1000),
     ]
+    v = [v[0] for x in v]
+    return v + [2049 - sum(v)]
 
 class BSRNN(nn.Module):
     def __init__(self):
