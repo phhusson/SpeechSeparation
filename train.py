@@ -5,7 +5,6 @@ from torch.utils.data import DataLoader
 import wandb
 import argparse
 import sys
-from torchview import draw_graph
 
 from bsrnn import BSRNN
 from m_dataset import samples, MyDataSet, train_infer
@@ -20,6 +19,7 @@ def main():
 
     model = BSRNN().to("cuda")
     if args.dump_graph:
+        from torchview import draw_graph
         model = model.to('meta')
         x = torch.randn(2, 48000*60)
         x = torch.stft(x, n_fft=4096, hop_length=512, return_complex=True)
