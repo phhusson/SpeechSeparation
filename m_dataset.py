@@ -34,11 +34,9 @@ def infer(model, sample):
 
     stft_window = torch.hann_window(4096).to("cuda")
     waveform_std = waveform.std()
-    waveform /= waveform_std
     waveform = torch.stft(waveform, n_fft=4096, hop_length=512, return_complex=True, window=stft_window)
     x = model.forward(waveform)
     x = torch.istft(x, n_fft=4096, hop_length=512, window=stft_window)
-    x = x * waveform_std
 
     waveform_speech = waveform_speech[:, :x.shape[1]]
     return x, waveform_speech
