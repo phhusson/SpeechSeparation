@@ -35,24 +35,20 @@ def infer(model, sample):
     stft_window = torch.hann_window(4096).to("cuda")
     waveform = torch.stft(waveform, n_fft=4096, hop_length=512, return_complex=True, window=stft_window)
     x = model.forward(waveform)
-    x = torch.istft(x, n_fft=4096, hop_length=512, window=stft_window)
+    x_time = torch.istft(x, n_fft=4096, hop_length=512, window=stft_window)
+    waveform_speech_freq = torch.stft(waveform_speech, n_fft=4096, hop_length=512, return_complex=True, window=stft_window)
 
-    waveform_speech = waveform_speech[:, :x.shape[1]]
-    return x, waveform_speech
+    waveform_speech = waveform_speech[:, :x_time.shape[1]]
+    return x, x_time, waveform_speech_freq, waveform_speech
 
 def train_infer(model, sample, lossfn, verbose=False):
-    x, waveform_speech = infer(model, sample)
+    x_freq, x_time, waveform_speech_freq, waveform_speech_time = infer(model, sample)
 
-    if verbose:
-        print("x", x.mean().item(), x.max().item(), x.std().item(), x.min().item())
-        print("waveform_speech", waveform_speech.mean().item(), waveform_speech.max().item(),
-              waveform_speech.std().item(), waveform_speech.min().item())
-    ftx = torch.stft(x, n_fft=4096, hop_length=4096, return_complex=True, window=torch.hann_window(4096).to("cuda"))
-    fts = torch.stft(waveform_speech, n_fft=4096, hop_length=4096, return_complex=True, window=torch.hann_window(4096).to("cuda"))
-
-    loss = lossfn(x, waveform_speech) + lossfn(ftx.real, fts.real) + lossfn(ftx.imag, fts.imag)
-    n2Source = torch.sum(torch.square(waveform_speech), dim=1)
-    n2Delta = torch.sum(torch.square(x - waveform_speech), dim=1)
+    loss = (lossfn(x_time, waveform_speech_time) +
+            lossfn(x_freq.real, waveform_speech_freq.real) +
+            lossfn(x_freq.imag, waveform_speech_freq.imag))
+    n2Source = torch.sum(torch.square(waveform_speech_time), dim=1)
+    n2Delta = torch.sum(torch.square(x_time - waveform_speech_time), dim=1)
     sdr = 10 * torch.log10(n2Source / n2Delta)
     sdr = sdr.mean()
     return loss, sdr
