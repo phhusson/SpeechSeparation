@@ -13,6 +13,7 @@ parser = argparse.ArgumentParser(description='Train a BSRNN model')
 parser.add_argument('--datapath', type=str, default='/home/phh/d/d/d4/dnr_v2', help='Path to the dataset')
 parser.add_argument('--mini', action='store_true', help='Use a small dataset')
 parser.add_argument('--dump_graph', action='store_true', help='Dump the compute graph to graph.dot')
+parser.add_argument('--batch_size', type=int, default=1, help='Batch size')
 args = parser.parse_args()
 
 def main():
@@ -66,8 +67,13 @@ def main():
             epochLoss += loss.item()
             epochSdr += sdr.item()
 
-            optimizer.step()
-            optimizer.zero_grad()
+            if args.batch_size == 1:
+                optimizer.step()
+                optimizer.zero_grad()
+            else:
+                if batchI % args.batch_size == 0:
+                    optimizer.step()
+                    optimizer.zero_grad()
 
         optimizer.step()
         optimizer.zero_grad()
