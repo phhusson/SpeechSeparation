@@ -142,12 +142,6 @@ class BSRNN(nn.Module):
         # x is [2; T] where T is the number of samples
         # Do STFTs on the input, with a 4096 Window, and 1024 hop length (so 75% overlap)
         # (So one sample will be seen 4 times)
-        og_mean = x.mean()
-        og_std = x.std()
-        x = (x - og_mean) / og_std
-
-        pshape("Input", x.shape)
-        x = torch.stft(x, n_fft=4096, hop_length=512, return_complex=True, window=torch.hann_window(4096).to("cuda"))
 
         pshape("STFT", x.shape)
         # x is now [2; F; T/512] where F is the number of frequencies, here 2049
@@ -197,7 +191,5 @@ class BSRNN(nn.Module):
         pshape("x is ", x.shape)
 
         x = x * mask_estimations
-        x = torch.istft(x, n_fft=4096, hop_length=512, window=torch.hann_window(4096).to("cuda"))
-        x = x * og_std + og_mean
 
         return x
