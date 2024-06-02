@@ -1,21 +1,35 @@
 #!/usr/bin/env python
 
 import torch
-from bsrnn import BSRNN
+from torch.utils.data import DataLoader
 import wandb
 import argparse
+import sys
+from torchview import draw_graph
 
+from bsrnn import BSRNN
 from m_dataset import samples, MyDataSet, train_infer
-from torch.utils.data import DataLoader
 
 parser = argparse.ArgumentParser(description='Train a BSRNN model')
 parser.add_argument('--datapath', type=str, default='/home/phh/d/d/d4/dnr_v2', help='Path to the dataset')
 parser.add_argument('--mini', action='store_true', help='Use a small dataset')
+parser.add_argument('--dump_graph', action='store_true', help='Dump the compute graph to graph.dot')
 args = parser.parse_args()
 
 def main():
-    wandb.init()
+
     model = BSRNN().to("cuda")
+    if args.dump_graph:
+        model = model.to('meta')
+        x = torch.randn(2, 48000*60)
+        x = torch.stft(x, n_fft=4096, hop_length=512, return_complex=True)
+        model_graph = draw_graph(model, input_data=x, device='meta')
+        with open('graph.dot', 'w') as f:
+            f.write(model_graph.visual_graph.source)
+
+        sys.exit(0)
+
+    wandb.init()
     wandb.watch(model)
     # List the folders  in $sample_bases / tr (every folder there is a train sample)
 
