@@ -14,6 +14,7 @@ parser.add_argument('--datapath', type=str, default='/home/phh/d/d/d4/dnr_v2', h
 parser.add_argument('--mini', action='store_true', help='Use a small dataset')
 parser.add_argument('--dump_graph', action='store_true', help='Dump the compute graph to graph.dot')
 parser.add_argument('--batch_size', type=int, default=1, help='Batch size')
+parser.add_argument('--resume', action='store_true', help='Reload model')
 args = parser.parse_args()
 
 def main():
@@ -32,9 +33,11 @@ def main():
 
     wandb.init()
     wandb.watch(model)
+    if args.resume:
+        model.load_state_dict(torch.load("model.pth"))
 
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=10)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=2, factor=0.5)
     l1loss = torch.nn.L1Loss(reduction='mean')
 
     train = samples(args.datapath, 'tr')

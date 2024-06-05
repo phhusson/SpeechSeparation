@@ -115,7 +115,7 @@ class BSRNN(nn.Module):
         self.bandFCs = nn.ModuleList([
             nn.Sequential(
                 nn.Linear(x * 2, band_features),
-                nn.PReLU(),
+                nn.LeakyReLU(),
                 nn.Linear(band_features, band_features),
             ) for x in generate_bandsplits()
         ])
@@ -123,7 +123,7 @@ class BSRNN(nn.Module):
         num_lstm_layers = 2
         self.lstms = nn.Sequential()
         for j in range(num_lstm_layers):
-            self.lstms.append(BandwiseFC())
+            self.lstms.append(BandwiseLSTM())
             self.lstms.append(TimewiseLSTM())
 
         # Get back from the band features into full bands
@@ -132,27 +132,26 @@ class BSRNN(nn.Module):
         self.bandFCs_back = nn.ModuleList([
             nn.Sequential(
                 nn.Linear(band_features, mask_estimation_mlp_hidden),
-                nn.PReLU(),
+                nn.LeakyReLU(),
                 nn.Linear(mask_estimation_mlp_hidden, x * 2 * 2),
                 nn.GLU(),
             ) for x in generate_bandsplits()])
 
+    # Signal is 48kHz
+    # pre-x is [2; T] where T is the number of samples
+    # Caller do STFTs on the input, with a 4096 Window, and 512 hop length (so 88% overlap)
+    # (So one sample will be seen 8 times)
+    # Input `x` of this function is [2; F; T/512] where F is the number of frequencies, here 2049
+    # From here on, we stop saying "T/512" but just T
     def forward(self, x):
-        # Signal is 48kHz
-        # x is [2; T] where T is the number of samples
-        # Do STFTs on the input, with a 4096 Window, and 1024 hop length (so 75% overlap)
-        # (So one sample will be seen 4 times)
 
         pshape("STFT", x.shape)
-        # x is now [2; F; T/512] where F is the number of frequencies, here 2049
-        # From here on, we stop saying "T/512" but just T
-        # We want to split the frequencies in bands
         bandsplit = generate_bandsplits()
         current_band_start = 0
         bands = []
+        # We want to split the frequencies in bands
         for band in bandsplit:
             b = x[:, current_band_start:current_band_start + band, :]
-            b /= torch.linalg.vector_norm(b)
             bands.append(b)
             current_band_start += band
 
