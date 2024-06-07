@@ -11,7 +11,7 @@ def pshape(*args):
 
 
 # Takes as input [C; A; B] and outputs [C; A; B]; where C are ignored, A is
-band_features = 64
+band_features = 128
 class NormRNNResidual(nn.Module):
     def __init__(self, bidirectional = False):
         super(NormRNNResidual, self).__init__()
@@ -65,9 +65,9 @@ class TimewiseLSTM(nn.Module):
     def forward_recurrent(self, x, state):
         # X is [2; nBands; 128], we need [2 * nBands; 1; 128]
         x = x.reshape( (-1, 1, band_features) )
-        x, state = self.m.forward_recurrent(x, state)
+        x, state = self.m.forward_recurrent(x, (state[0], state[1]))
         x = x.reshape( (2, -1, band_features) )
-        return x, state
+        return x, torch.stack(state, dim=0)
 
 # Take as input [2; T; nBands; 128] and output [2; T; nBands; 128]
 class BandwiseLSTM(nn.Module):
@@ -250,6 +250,7 @@ class BSRNN(nn.Module):
             else:
                 band_outputs = layer.forward_recurrent(band_outputs)
             pshape(band_outputs.shape)
+        new_state = torch.stack(new_state, dim=0)
 
 
         bands_with_time_and_bands = band_outputs

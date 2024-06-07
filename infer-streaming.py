@@ -15,11 +15,26 @@ parser.add_argument("--input", type=str, help="Input file")
 parser.add_argument("--output", type=str, help="Output file")
 args = parser.parse_args()
 
+class ToTrace(torch.nn.Module):
+    def __init__(self, model):
+        super(ToTrace, self).__init__()
+        self.model = model
+
+    def forward(self, x, state):
+        return self.model.forward_recurrent(x, state)
+
+
 model = BSRNN().to("cpu")
 model.load_state_dict(torch.load("model.pth"))
 model.eval()
+
+tmodel = ToTrace(model)
+# Compile the model to torchscript for faster execution using tracing
+example_input = (torch.ones([2, 2049], dtype=torch.complex64), torch.zeros((2, 2, 2, 36, 128)))
+model = torch.jit.trace(tmodel, example_input)
+
 #torch.onnx.dynamo_export(model, torch.ones([2, 2049, 512]))
-#torch.onnx.export(model, torch.ones([2, 2049, 512], dtype = torch.complex64), "hello.onnx", opset_version=15)
+#torch.onnx.export(model, example_input, "hello.onnx", opset_version=15)
 
 streamer = torchaudio.io.StreamReader(args.input)
 streamer.add_basic_audio_stream(frames_per_chunk=512, sample_rate=44100)
@@ -31,33 +46,29 @@ writer.open()
 stft_window = torch.hann_window(4096).to("cpu")
 current_waveform = torch.zeros( (2, 4096) )
 # TODO: How to retrieve this shape automatically?
-# Innermost *2 is for c_x h_x, outermost *2 is for the number of timewise LSTM
-state = [[torch.zeros((2, 36, 64))] * 2] * 2
+# 2 Timewise LSTM x (c_x,h_x) x LSTM state
+state = torch.zeros((2, 2, 2, 36, 128))
 # With 512/4096 hop there are 4 blocks left of center.
 # The next 512 new samples are the 512 after center of current
 # the 512 before center of current-1
 # the 512 off 512 of current-2, etc
-previous_speech = [torch.zeros( (2, 4096))] * 7
+previous_speech = [torch.zeros( (2, 4096))] * 8
 for chunks in streamer.stream():
-    print(chunks)
-    print(chunks[0].shape)
+
     # chunks[0] is [512; 2]
     waveform = chunks[0].permute( (1, 0) )
     # Mono to stereo
     if waveform.shape[0] == 1:
         waveform = torch.cat((waveform, waveform), 0)
-    print(current_waveform[:,512:].shape, waveform.shape)
+
     waveform = torch.cat( (current_waveform[:,512:], waveform), 1)
     current_waveform = waveform
-    print(waveform.shape)
 
     x = torch.fft.rfft(waveform * stft_window)
     x = x.reshape((2, -1))
-    x, state = model.forward_recurrent(x, state)
-    print("state", state[0][0])
-    print(x.shape)
+    #x, state = model.forward_recurrent(x, state)
+    x, state = model(x, state)
     waveform = torch.fft.irfft(x)
-    print("irfft", waveform.shape)
     
     previous_speech = [
             waveform,
@@ -74,16 +85,12 @@ for chunks in streamer.stream():
     current_range = (0, 512)
     for wf in previous_speech:
         win = stft_window[current_range[0]:current_range[1]]
-        print(win.shape)
         sum_of_window = sum_of_window + win
         new_samples = new_samples + wf[:, current_range[0]:current_range[1]]
-        print("current_range", current_range, "win max", win.max())
         current_range = (current_range[0] + 512, current_range[1] + 512)
 
     new_samples = new_samples / sum_of_window
 
-    print("final waveform", waveform.shape)
-    print(new_samples.shape)
     writer.write_audio_chunk(0, new_samples.permute( (1,0)) )
 
 sys.exit(0)
