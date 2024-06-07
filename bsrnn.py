@@ -13,19 +13,33 @@ def pshape(*args):
 # Takes as input [C; A; B] and outputs [C; A; B]; where C are ignored, A is
 band_features = 64
 class NormRNNResidual(nn.Module):
-    def __init__(self):
+    def __init__(self, bidirectional = False):
         super(NormRNNResidual, self).__init__()
-        self.groupnorm = nn.InstanceNorm1d(band_features)
-        self.rnn = nn.LSTM(band_features, band_features, batch_first=True, num_layers=2)
-        self.fc = nn.Linear(band_features, band_features)
+        self.groupnorm = nn.InstanceNorm1d(band_features, track_running_stats=True)
+        self.fc_in = nn.Linear(band_features, band_features)
+        self.rnn = nn.LSTM(band_features, band_features, batch_first=True, num_layers=2, bidirectional=bidirectional)
+        n = band_features
+        if bidirectional:
+            n = band_features * 2
+        self.fc = nn.Linear(n, band_features)
 
     def forward(self, x: torch.Tensor):
         out = x
-        out = self.groupnorm(out.permute((0, 2, 1))).permute((0, 2, 1))
+        #out = self.groupnorm(out.permute((0, 2, 1))).permute((0, 2, 1))
+        out = self.fc_in(out)
         out = self.rnn(out)[0]
         out = self.fc(out)
         out = out + x
         return out
+
+    def forward_recurrent(self, x, state):
+        out = x
+        #out = self.groupnorm(out.permute((0, 2, 1))).permute((0, 2, 1))
+        out = self.fc_in(out)
+        out = self.rnn(out, state)[0]
+        out = self.fc(out)
+        out = out + x
+        return out, state
 
 # Take as input [2; T; nBands; 128] and output [2; T; nBands; 128]
 class TimewiseLSTM(nn.Module):
@@ -48,11 +62,18 @@ class TimewiseLSTM(nn.Module):
 
         return out
 
+    def forward_recurrent(self, x, state):
+        # X is [2; nBands; 128], we need [2 * nBands; 1; 128]
+        x = x.reshape( (-1, 1, band_features) )
+        x, state = self.m.forward_recurrent(x, state)
+        x = x.reshape( (2, -1, band_features) )
+        return x, state
+
 # Take as input [2; T; nBands; 128] and output [2; T; nBands; 128]
 class BandwiseLSTM(nn.Module):
     def __init__(self):
         super(BandwiseLSTM, self).__init__()
-        self.m = NormRNNResidual()
+        self.m = NormRNNResidual(bidirectional = True)
 
     def forward(self, x: torch.Tensor):
         # X is [2; T; nBands; 128], we need [2 * T ; nBands; 128]
@@ -63,6 +84,9 @@ class BandwiseLSTM(nn.Module):
         # Reshape back to [2; T; nBands; 128]
         out = out.reshape((2, -1, x.shape[1], x.shape[2]))
         return out
+
+    def forward_recurrent(self, x):
+        return self.m(x)
 
 class BandwiseFC(nn.Module):
     def __init__(self):
@@ -192,3 +216,60 @@ class BSRNN(nn.Module):
         x = x * mask_estimations
 
         return x
+
+    def forward_recurrent(self, x, state):
+        pshape("STFT", x.shape)
+        bandsplit = generate_bandsplits()
+        current_band_start = 0
+        bands = []
+        # We want to split the frequencies in bands
+        for band in bandsplit:
+            b = x[:, current_band_start:current_band_start + band]
+            bands.append(b)
+            current_band_start += band
+
+        # Now we have the bands, we can do the band specific processing
+        band_outputs = []
+        for i, band in enumerate(bands):
+            band = torch.cat((band.real, band.imag), 1)
+            pshape("Band ", i, band.shape)
+            y = self.bandFCs[i](band)
+            band_outputs.append(y)
+            pshape("Band output", i, y.shape)
+
+        # band_outputs is python array of 2D tensors, make it a 3D tensor
+        band_outputs = torch.stack(band_outputs, 1)
+        state_i = 0
+        new_state = []
+        for layer in self.lstms:
+            pshape("Layer ", type(layer))
+            if type(layer) is TimewiseLSTM:
+                band_outputs, s = layer.forward_recurrent(band_outputs, state[state_i])
+                state_i += 1
+                new_state += [s]
+            else:
+                band_outputs = layer.forward_recurrent(band_outputs)
+            pshape(band_outputs.shape)
+
+
+        bands_with_time_and_bands = band_outputs
+
+        # Now we have the bands with time and bands, we can do the band specific processing
+        mask_estimations = []
+        for i, ogBandFc in enumerate(self.bandFCs):
+            band = bands_with_time_and_bands[:, i, :]
+            band = self.bandFCs_back[i](band)
+            pshape("Band back pre", i, band.shape)
+            # band is [2; T; <filter size * 2>], we want to split it back into real and imaginary parts
+            band = band.reshape((2,  2, band.shape[1] // 2))
+            band = torch.complex(band[:, 0, :], band[:, 1, :])
+            pshape("Band back", i, band.shape)
+            mask_estimations.append(band)
+        mask_estimations = torch.cat(mask_estimations, 1)
+
+        pshape("Final mask is", mask_estimations.shape)
+        pshape("x is ", x.shape)
+
+        x = x * mask_estimations
+
+        return x, new_state
