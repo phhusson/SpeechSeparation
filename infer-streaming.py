@@ -30,11 +30,13 @@ model.eval()
 
 tmodel = ToTrace(model)
 # Compile the model to torchscript for faster execution using tracing
-example_input = (torch.ones([2, 2049 * 2]), torch.zeros((2, 2, 2, 36, 128)))
+example_input = (torch.ones([2, 2049 * 2]), torch.zeros((4, 2, 2, 58, 64)))
 model = torch.jit.trace(tmodel, example_input)
 
-#torch.onnx.dynamo_export(model, torch.ones([2, 2049, 512]))
-#torch.onnx.export(model, example_input, "hello.onnx", opset_version=15)
+#onnx_program = torch.onnx.dynamo_export(tmodel, example_input[0], example_input[1])
+#onnx_program.save("model.onnx")
+#torch.onnx.export(model, example_input, "hello.onnx", opset_version=17)
+print("Onnx model dumped")
 
 streamer = torchaudio.io.StreamReader(args.input)
 streamer.add_basic_audio_stream(frames_per_chunk=512, sample_rate=44100)
@@ -47,7 +49,7 @@ stft_window = torch.hann_window(4096).to("cpu")
 current_waveform = torch.zeros( (2, 4096) )
 # TODO: How to retrieve this shape automatically?
 # 2 Timewise LSTM x (c_x,h_x) x LSTM state
-state = torch.zeros((2, 2, 2, 36, 128))
+state = torch.zeros((4, 2, 2, 58, 64))
 # With 512/4096 hop there are 4 blocks left of center.
 # The next 512 new samples are the 512 after center of current
 # the 512 before center of current-1
@@ -68,9 +70,9 @@ for chunks in streamer.stream():
     x = torch.stack((x.real, x.imag), dim=2)
     x = x.reshape((2, -1))
 
-    x, state = model.forward_recurrent(x, state)
-    x = x.reshape((2,  2, -1))
-    x = torch.complex(x[:, 0, :], x[:, 1, :])
+    x, state = model(x, state)
+    x = x.reshape((2,  -1, 2))
+    x = torch.complex(x[:, :, 0], x[:, :, 1])
 
     waveform = torch.fft.irfft(x)
     

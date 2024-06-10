@@ -36,7 +36,7 @@ class NormRNNResidual(nn.Module):
         out = x
         #out = self.groupnorm(out.permute((0, 2, 1))).permute((0, 2, 1))
         out = self.fc_in(out)
-        out = self.rnn(out, state)[0]
+        out, state = self.rnn(out, state)
         out = self.fc(out)
         out = out + x
         return out, state
@@ -249,7 +249,7 @@ class BSRNN(nn.Module):
         bands = []
         # We want to split the frequencies in bands
         for band in bandsplit:
-            b = x[:, (2*current_band_start):(2*(current_band_start + band)), :]
+            b = x[:, (2*current_band_start):(2*(current_band_start + band))]
             bands.append(b)
             current_band_start += band
 

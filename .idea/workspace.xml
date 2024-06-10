@@ -8,6 +8,7 @@
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/bsrnn.py" beforeDir="false" afterPath="$PROJECT_DIR$/bsrnn.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/infer-streaming.py" beforeDir="false" afterPath="$PROJECT_DIR$/infer-streaming.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/train.py" beforeDir="false" afterPath="$PROJECT_DIR$/train.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -65,7 +66,7 @@
       <workItem from="1717096565932" duration="1000" />
       <workItem from="1717096604662" duration="47462000" />
       <workItem from="1717751752114" duration="1145000" />
-      <workItem from="1717752905286" duration="4231000" />
+      <workItem from="1717752905286" duration="10433000" />
     </task>
     <servers />
   </component>
