@@ -193,7 +193,8 @@ class BSRNN(nn.Module):
     # pre-x is [2; T] where T is the number of samples
     # Caller do STFTs on the input, with a 4096 Window, and 512 hop length (so 88% overlap)
     # (So one sample will be seen 8 times)
-    # Input `x` of this function is [2; F; T/512] where F is the number of frequencies, here 2049
+    # Input `x` of this function is [2; F * 2; T/512] where F is the number of frequencies,
+    # here 2049 * 2 to account for real + complex
     # From here on, we stop saying "T/512" but just T
     def forward(self, x):
 
@@ -203,7 +204,7 @@ class BSRNN(nn.Module):
         bands = []
         # We want to split the frequencies in bands
         for band in bandsplit:
-            b = x[:, current_band_start:current_band_start + band, :]
+            b = x[:, (2*current_band_start):(2*(current_band_start + band)), :]
             bands.append(b)
             current_band_start += band
 
@@ -212,8 +213,6 @@ class BSRNN(nn.Module):
         for i, band in enumerate(bands):
             # Permute the band to [2; T; F]
             band = band.permute((0, 2, 1))
-            # Concatenate the real and imaginary parts of band
-            band = torch.cat((band.real, band.imag), 2)
             pshape("Band ", i, band.shape)
             y = self.bandFCs[i](band)
             band_outputs.append(y)
@@ -229,9 +228,7 @@ class BSRNN(nn.Module):
             band = bands_with_time_and_bands[:, :, i, :]
             band = self.bandFCs_back[i](band)
             pshape("Band back pre", i, band.shape)
-            # band is [2; T; <filter size * 2>], we want to split it back into real and imaginary parts
-            band = band.reshape((2, -1, 2, band.shape[2] // 2))
-            band = torch.complex(band[:, :, 0, :], band[:, :, 1, :])
+            # band is [2; T; <filter size * 2>]
             pshape("Band back", i, band.shape)
             mask_estimations.append(band)
         mask_estimations = torch.cat(mask_estimations, 2)
@@ -252,15 +249,13 @@ class BSRNN(nn.Module):
         bands = []
         # We want to split the frequencies in bands
         for band in bandsplit:
-            b = x[:, current_band_start:current_band_start + band]
+            b = x[:, (2*current_band_start):(2*(current_band_start + band)), :]
             bands.append(b)
             current_band_start += band
 
         # Now we have the bands, we can do the band specific processing
         band_outputs = []
         for i, band in enumerate(bands):
-            band = torch.cat((band.real, band.imag), 1)
-            pshape("Band ", i, band.shape)
             y = self.bandFCs[i](band)
             band_outputs.append(y)
             pshape("Band output", i, y.shape)
@@ -289,9 +284,7 @@ class BSRNN(nn.Module):
             band = bands_with_time_and_bands[:, i, :]
             band = self.bandFCs_back[i](band)
             pshape("Band back pre", i, band.shape)
-            # band is [2; T; <filter size * 2>], we want to split it back into real and imaginary parts
-            band = band.reshape((2,  2, band.shape[1] // 2))
-            band = torch.complex(band[:, 0, :], band[:, 1, :])
+            # band is [2; T; <filter size * 2>]
             pshape("Band back", i, band.shape)
             mask_estimations.append(band)
         mask_estimations = torch.cat(mask_estimations, 1)

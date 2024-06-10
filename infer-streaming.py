@@ -30,7 +30,7 @@ model.eval()
 
 tmodel = ToTrace(model)
 # Compile the model to torchscript for faster execution using tracing
-example_input = (torch.ones([2, 2049], dtype=torch.complex64), torch.zeros((2, 2, 2, 36, 128)))
+example_input = (torch.ones([2, 2049 * 2]), torch.zeros((2, 2, 2, 36, 128)))
 model = torch.jit.trace(tmodel, example_input)
 
 #torch.onnx.dynamo_export(model, torch.ones([2, 2049, 512]))
@@ -65,9 +65,13 @@ for chunks in streamer.stream():
     current_waveform = waveform
 
     x = torch.fft.rfft(waveform * stft_window)
+    x = torch.stack((x.real, x.imag), dim=2)
     x = x.reshape((2, -1))
-    #x, state = model.forward_recurrent(x, state)
-    x, state = model(x, state)
+
+    x, state = model.forward_recurrent(x, state)
+    x = x.reshape((2,  2, -1))
+    x = torch.complex(x[:, 0, :], x[:, 1, :])
+
     waveform = torch.fft.irfft(x)
     
     previous_speech = [

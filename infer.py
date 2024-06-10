@@ -28,7 +28,11 @@ if waveform.shape[0] == 1:
 stft_window = torch.hann_window(4096).to("cpu")
 orig_peak = waveform.max().item()
 x = torch.stft(waveform, n_fft=4096, hop_length=512, return_complex=True, window=stft_window)
+x = torch.stack((x.real, x.imag), dim=2)
+x = x.reshape( (x.shape[0], x.shape[1] * 2, x.shape[3]))
 x = model.forward(x)
+x = x.reshape((2, -1, 2, x.shape[2]))
+x = torch.complex(x[:, :, 0, :], x[:, :, 1, :])
 x = torch.istft(x, n_fft=4096, hop_length=512, window=stft_window)
 
 x = x.cpu()
