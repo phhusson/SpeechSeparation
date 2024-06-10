@@ -10,8 +10,8 @@ def pshape(*args):
     #print(*args)
 
 
+band_features = 64
 # Takes as input [C; A; B] and outputs [C; A; B]; where C are ignored, A is
-band_features = 128
 class NormRNNResidual(nn.Module):
     def __init__(self, bidirectional = False):
         super(NormRNNResidual, self).__init__()
@@ -109,26 +109,54 @@ class BandwiseFC(nn.Module):
         return out
 
 def generate_bandsplits():
-    # Note: this splits in a logarithmic way, but maybe this makes the biggest bands too big
+    #v = [
+    #    (4, 0),
+    #    (4, 4),
+    #    (4, 8),
+    #    (4, 12),
+    #    (8, 16),
+    #    (8, 24),
+    #    (16, 32),
+    #    (16, 48),
+    #    (64, 64),
+    #    (128, 128),
+    #    (256, 256),
+    #    (512, 512),
+    #]
     v = [
-        (10, 0),
-        (10, 10),
+        (5, 0),
+        (5, 5),
+        (5, 10),
+        (5, 15),
         (10, 20),
         (10, 30),
         (10, 40),
         (10, 50),
-        (20, 60),
-        (20, 80),
+        (10, 60),
+        (10, 70),
+        (10, 80),
+        (10, 90),
         (50, 100),
         (50, 150),
         (50, 200),
         (50, 250),
-        (100, 300),
-        (100, 400),
-        (250, 500),
-        (250, 750),
-        (500, 1000),
+        (50, 300),
+        (50, 350),
+        (50, 400),
+        (50, 450),
+        (100, 500),
+        (100, 600),
+        (100, 700),
+        (100, 800),
+        (100, 900),
+        (250, 1000),
+        (250, 1250),
+        (250, 1500),
     ]
+    pos = 0
+    for x,y in v:
+        assert y == pos
+        pos += x
     v = [x[0] for x in v]
     return v + [2049 - sum(v)]
 
@@ -144,7 +172,7 @@ class BSRNN(nn.Module):
             ) for x in generate_bandsplits()
         ])
 
-        num_lstm_layers = 2
+        num_lstm_layers = 4
         self.lstms = nn.Sequential()
         for j in range(num_lstm_layers):
             self.lstms.append(BandwiseLSTM())
@@ -152,7 +180,7 @@ class BSRNN(nn.Module):
 
         # Get back from the band features into full bands
         # Paper has hidden layer 512
-        mask_estimation_mlp_hidden = 512
+        mask_estimation_mlp_hidden = band_features * 2 * 2
         self.bandFCs_back = nn.ModuleList([
             nn.Sequential(
                 nn.Linear(band_features, mask_estimation_mlp_hidden),

@@ -15,6 +15,7 @@ parser.add_argument('--mini', action='store_true', help='Use a small dataset')
 parser.add_argument('--dump_graph', action='store_true', help='Dump the compute graph to graph.dot')
 parser.add_argument('--batch_size', type=int, default=1, help='Batch size')
 parser.add_argument('--resume', action='store_true', help='Reload model')
+parser.add_argument('--loss_sdr', action='store_true', help='Use SDR as loss')
 args = parser.parse_args()
 
 def main():
@@ -65,7 +66,11 @@ def main():
             loss, sdr = train_infer(model, sample, l1loss)
 
             batchI += 1
-            loss.backward()
+            if args.loss_sdr:
+                toBackward = -sdr
+            else:
+                toBackward = loss
+            toBackward.backward()
             epochLoss += loss.item()
             epochSdr += sdr.item()
 
