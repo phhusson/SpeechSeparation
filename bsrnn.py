@@ -158,7 +158,8 @@ def generate_bandsplits():
         assert y == pos
         pos += x
     v = [x[0] for x in v]
-    return v + [2049 - sum(v)]
+    v = v + [2049 - sum(v)]
+    return v
 
 class BSRNN(nn.Module):
     def __init__(self):
