@@ -212,12 +212,7 @@ class BSRNN(nn.Module):
         pshape("STFT", x.shape)
         bandsplit = generate_bandsplits()
         current_band_start = 0
-        bands = []
-        # We want to split the frequencies in bands
-        for band in bandsplit:
-            b = x[:, (2*current_band_start):(2*(current_band_start + band)), :]
-            bands.append(b)
-            current_band_start += band
+        bands = x.split( [2 * x for x in generate_bandsplits()], dim = 1)
 
         # Now we have the bands, we can do the band specific processing
         band_outputs = []
@@ -257,12 +252,7 @@ class BSRNN(nn.Module):
         pshape("STFT", x.shape)
         bandsplit = generate_bandsplits()
         current_band_start = 0
-        bands = []
-        # We want to split the frequencies in bands
-        for band in bandsplit:
-            b = x[:, (2*current_band_start):(2*(current_band_start + band))]
-            bands.append(b)
-            current_band_start += band
+        bands = x.split( [2 * x for x in generate_bandsplits()], dim = 1)
 
         # Now we have the bands, we can do the band specific processing
         band_outputs = []
