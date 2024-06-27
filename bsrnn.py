@@ -159,8 +159,8 @@ def generate_bandsplits():
     #    (250, 1500),
     #]
     pos = 5
-    mul = math.sqrt(2)
     # Split each "octave" in two
+    mul = 2
     v = [(5, 0)]
     while pos < 2049:
         n = int(pos * mul)
