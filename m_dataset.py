@@ -1,4 +1,5 @@
 import os
+import random
 import torchaudio
 import torch
 
@@ -32,6 +33,9 @@ def infer(model, sample):
     waveform = waveform.squeeze(0)
     waveform_speech = waveform_speech.squeeze(0)
 
+    scale = random.uniform(0.02, 1.0)
+    waveform *= scale
+    waveform_speech *= scale
     stft_window = torch.hann_window(4096).to("cuda")
     waveform = torch.stft(waveform, n_fft=4096, hop_length=512, return_complex=True, window=stft_window)
     waveform = torch.stack((waveform.real, waveform.imag), dim=2)
