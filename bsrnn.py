@@ -188,7 +188,7 @@ class BSRNN(nn.Module):
             ) for x in generate_bandsplits()
         ])
 
-        num_lstm_layers = 4
+        num_lstm_layers = 2
         self.lstms = nn.Sequential()
         for j in range(num_lstm_layers):
             self.lstms.append(BandwiseLSTM())
