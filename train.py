@@ -19,6 +19,7 @@ parser.add_argument('--loss_sdr', action='store_true', help='Use SDR as loss')
 args = parser.parse_args()
 
 def main():
+    torch.multiprocessing.set_start_method('spawn')
 
     model = BSRNN().to("cuda")
     if args.dump_graph:
@@ -52,8 +53,8 @@ def main():
     test = samples(args.datapath, 'tt')
     test = MyDataSet(test)
 
-    train_loader = DataLoader(train, batch_size=1, shuffle=True)
-    val_loader = DataLoader(val, batch_size=1, shuffle=True)
+    train_loader = DataLoader(train, batch_size=1, shuffle=True, num_workers=2)
+    val_loader = DataLoader(val, batch_size=1, shuffle=True, num_workers=2)
 
     epochI = 0
     while True:
