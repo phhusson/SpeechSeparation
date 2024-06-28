@@ -6,8 +6,9 @@ import torch
 def samples(sample_bases, folder):
     s = [sample_bases + '/' + folder + '/' + x for x in os.listdir(sample_bases + '/' + folder)]
     # Filter out files
-    s = [x for x in s if os.path.isdir(x)]
-    s = [(x + '/mix.wav', x + '/speech.wav') for x in s]
+    sdirs = [x for x in s if os.path.isdir(x)]
+    s = [(x + '/mix.wav', x + '/speech.wav') for x in sdirs]
+    s += [(x + '/speech.wav', x + '/speech.wav') for x in sdirs]
     return s
 
 
