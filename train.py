@@ -58,6 +58,7 @@ def main():
     val_loader = DataLoader(val, batch_size=1, shuffle=True, num_workers=2)
 
     epochI = 0
+    best = 0
     while True:
         print("Epoch", epochI)
         batchI = 0
@@ -90,7 +91,6 @@ def main():
 
         print("Epoch", epochI, "Loss", epochLoss / batchI, "lr", scheduler.get_last_lr(), "sdr", epochSdr / batchI)
         scheduler.step(epochLoss / batchI)
-        torch.save(model.state_dict(), "model.pth")
         epochI += 1
 
         with torch.no_grad():
@@ -104,6 +104,9 @@ def main():
 
             print("Validation Loss", valLoss / len(val), "Validation SDR", valSdr / len(val))
             wandb.log({"val_loss": valLoss / len(val), "val_sdr": valSdr / len(val)})
+            if valLoss > best:
+                best = valLoss
+                torch.save(model.state_dict(), "model.pth")
 
         model.train()
 
