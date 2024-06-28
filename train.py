@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import torch
+from tqdm import tqdm
 from torch.utils.data import DataLoader
 import wandb
 import argparse
@@ -63,7 +64,7 @@ def main():
 
         epochLoss = 0.0
         epochSdr = 0.0
-        for sample in train_loader:
+        for sample in tqdm(train_loader):
             loss, sdr = train_infer(model, sample, l1loss)
 
             batchI += 1
