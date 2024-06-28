@@ -43,7 +43,7 @@ def main():
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=2, factor=0.5)
     l1loss = torch.nn.L1Loss(reduction='mean')
 
-    train = samples(args.datapath, 'tr')
+    train = samples(args.datapath, 'tr', with_s2s = True)
     if args.mini:
         train = train[:10]
     train = MyDataSet(train)
