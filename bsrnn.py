@@ -132,7 +132,7 @@ class BandwiseFC(nn.Module):
         out = self.layers(out)
         # Reshape back to [2; T; nBands; 128]
         out = out.reshape((nChannels, x.shape[1], len(generate_bandsplits()), band_features))
-        return out
+        return out + x
 
     def forward_recurrent(self, x: torch.Tensor):
         # X is [2; nBands; 128], we need [2 ; nBands * 128]
@@ -141,7 +141,7 @@ class BandwiseFC(nn.Module):
         out = self.layers(out)
         # Reshape back to [2; T; nBands; 128]
         out = out.reshape((nChannels, len(generate_bandsplits()), band_features))
-        return out
+        return out + x
 
 class BandwiseNoop(nn.Module):
     def __init__(self):
@@ -177,14 +177,14 @@ class BandwiseConv(nn.Module):
         out = self.layers(out)
         out = out.reshape( (nChannels, -1, band_features, self.nBands) )
         out = out.permute( (0, 1, 3, 2) )
-        return out
+        return out + x
 
     def forward_recurrent(self, x):
         # X is [2; nBands; 128], we want [2*T; 128; nBands]
         out = x.permute( (0, 2, 1) )
         out = self.layers(out)
         out = out.permute( (0, 1, 2) )
-        return out
+        return out + x
 
 
 def generate_bandsplits():
