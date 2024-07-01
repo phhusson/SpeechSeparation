@@ -9,14 +9,29 @@ def pshape(*args):
     pass
     #print(*args)
 
+# This is a module to do an InstanceNorm1d on the last dim of the tensor, instead of the middle one
+class XXCInstanceNorm1d(nn.Module):
+    def __init__(self, num_channels):
+        super(XXCInstanceNorm1d, self).__init__()
+        self.groupnorm = nn.InstanceNorm1d(num_channels, track_running_stats=True)
+
+    def forward(self, x):
+        out = x.reshape( (-1, x.shape[-2], x.shape[-1]) )
+        out = out.permute( (0, 2, 1) )
+        out = self.groupnorm(out)
+        out = out.permute( (0, 2, 1) )
+        out = out.reshape(x.shape)
+        return out
 
 band_features = 64
 merge_channels = True
 # Takes as input [C; A; B] and outputs [C; A; B]; where C are ignored, A is
 class NormRNNResidual(nn.Module):
-    def __init__(self, bidirectional = False):
+    def __init__(self, bidirectional = False, with_groupnorm = None):
         super(NormRNNResidual, self).__init__()
-        self.groupnorm = nn.InstanceNorm1d(band_features, track_running_stats=True)
+        self.groupnorm = None
+        if with_groupnorm:
+            self.groupnorm = nn.InstanceNorm1d(with_groupnorm, track_running_stats=True)
         self.fc_in = nn.Linear(band_features, band_features)
         self.rnn = nn.LSTM(band_features, band_features, batch_first=True, num_layers=2, bidirectional=bidirectional)
         n = band_features
@@ -26,7 +41,8 @@ class NormRNNResidual(nn.Module):
 
     def forward(self, x: torch.Tensor):
         out = x
-        #out = self.groupnorm(out.permute((0, 2, 1))).permute((0, 2, 1))
+        if self.groupnorm:
+            out = self.groupnorm(out.reshape((x.shape[0], -1)).permute( (1, 0))).permute( (1, 0)).reshape(x.shape)
         out = self.fc_in(out)
         out = self.rnn(out)[0]
         out = self.fc(out)
@@ -35,7 +51,8 @@ class NormRNNResidual(nn.Module):
 
     def forward_recurrent(self, x, state):
         out = x
-        #out = self.groupnorm(out.permute((0, 2, 1))).permute((0, 2, 1))
+        if self.groupnorm:
+            out = self.groupnorm(out.reshape((x.shape[0], -1))).reshape(x.shape)
         out = self.fc_in(out)
         out, state = self.rnn(out, state)
         out = self.fc(out)
@@ -76,7 +93,8 @@ class TimewiseLSTM(nn.Module):
 class BandwiseLSTM(nn.Module):
     def __init__(self):
         super(BandwiseLSTM, self).__init__()
-        self.m = NormRNNResidual(bidirectional = True)
+        nBands = len(generate_bandsplits())
+        self.m = NormRNNResidual(bidirectional = True, with_groupnorm = nBands * band_features)
 
     def forward(self, x: torch.Tensor):
         # X is [2; T; nBands; 128], we need [2 * T ; nBands; 128]
@@ -96,22 +114,78 @@ class BandwiseFC(nn.Module):
     def __init__(self):
         super(BandwiseFC, self).__init__()
         nBands = len(generate_bandsplits())
-        self.fc1 = nn.Linear(band_features * nBands, band_features * nBands)
-        self.fc2 = nn.Linear(band_features * nBands, band_features * nBands)
-        self.fc3 = nn.Linear(band_features * nBands, band_features * nBands)
+        self.layers = nn.Sequential(
+                XXCInstanceNorm1d(band_features * nBands),
+                nn.Linear(band_features * nBands, band_features * nBands),
+                nn.Sigmoid(),
+                nn.Linear(band_features * nBands, band_features * nBands),
+                nn.Sigmoid(),
+                nn.Linear(band_features * nBands, band_features * nBands),
+                nn.Sigmoid(),
+                nn.Linear(band_features * nBands, band_features * nBands),
+        )
 
     def forward(self, x: torch.Tensor):
         # X is [2; T; nBands; 128], we need [2 ; T ; nBands * 128]
         nChannels = x.shape[0]
         out = x.reshape((nChannels, x.shape[1], -1))
-        out = self.fc1(out)
-        out = F.tanh(out)
-        out = self.fc2(out)
-        out = F.tanh(out)
-        out = self.fc3(out)
+        out = self.layers(out)
         # Reshape back to [2; T; nBands; 128]
         out = out.reshape((nChannels, x.shape[1], len(generate_bandsplits()), band_features))
         return out
+
+    def forward_recurrent(self, x: torch.Tensor):
+        # X is [2; nBands; 128], we need [2 ; nBands * 128]
+        nChannels = x.shape[0]
+        out = x.reshape((nChannels, -1))
+        out = self.layers(out)
+        # Reshape back to [2; T; nBands; 128]
+        out = out.reshape((nChannels, len(generate_bandsplits()), band_features))
+        return out
+
+class BandwiseNoop(nn.Module):
+    def __init__(self):
+        super(BandwiseNoop, self).__init__()
+
+    def forward(self, x):
+        return x
+
+class BandwiseConv(nn.Module):
+    def __init__(self):
+        super(BandwiseConv, self).__init__()
+        self.nBands = len(generate_bandsplits())
+        self.layers = nn.Sequential(
+            XXCInstanceNorm1d(self.nBands),
+            nn.Conv1d(band_features, band_features, 3, stride = 1, padding = 'same'),
+            nn.LeakyReLU(),
+            nn.Conv1d(band_features, band_features, 3, stride = 1, padding = 'same'),
+            nn.LeakyReLU(),
+            nn.Conv1d(band_features, band_features, 3, stride = 1, padding = 'same'),
+            nn.LeakyReLU(),
+            nn.Conv1d(band_features, band_features, 3, stride = 1, padding = 'same'),
+            nn.LeakyReLU(),
+            nn.Conv1d(band_features, band_features, 3, stride = 1, padding = 'same'),
+            nn.LeakyReLU(),
+            nn.Conv1d(band_features, band_features, 3, stride = 1, padding = 'same')
+        )
+
+    def forward(self, x: torch.Tensor):
+        # X is [2; T; nBands; 128], we want [2*T; 128; nBands]
+        nChannels = x.shape[0]
+        out = x.permute( (0, 1, 3, 2) )
+        out = out.reshape( (-1, band_features, self.nBands) )
+        out = self.layers(out)
+        out = out.reshape( (nChannels, -1, band_features, self.nBands) )
+        out = out.permute( (0, 1, 3, 2) )
+        return out
+
+    def forward_recurrent(self, x):
+        # X is [2; nBands; 128], we want [2*T; 128; nBands]
+        out = x.permute( (0, 2, 1) )
+        out = self.layers(out)
+        out = out.permute( (0, 1, 2) )
+        return out
+
 
 def generate_bandsplits():
     #v = [
