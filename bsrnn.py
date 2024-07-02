@@ -94,7 +94,7 @@ class BandwiseLSTM(nn.Module):
     def __init__(self):
         super(BandwiseLSTM, self).__init__()
         nBands = len(generate_bandsplits())
-        self.m = NormRNNResidual(bidirectional = True, with_groupnorm = nBands * band_features)
+        self.m = NormRNNResidual(bidirectional = True)
 
     def forward(self, x: torch.Tensor):
         # X is [2; T; nBands; 128], we need [2 * T ; nBands; 128]
