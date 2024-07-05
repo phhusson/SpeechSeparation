@@ -275,7 +275,9 @@ class BSRNN(nn.Module):
             nn.Sequential(
                 nn.Linear(band_features, mask_estimation_mlp_hidden),
                 nn.LeakyReLU(),
-                nn.Linear(mask_estimation_mlp_hidden, x * 2 * 2),
+                nn.Linear(mask_estimation_mlp_hidden, mask_estimation_mlp_hidden),
+                nn.LeakyReLU(),
+                nn.Linear(mask_estimation_mlp_hidden, x * 2 * 2 * 2),
                 nn.GLU(),
             ) for x in generate_bandsplits()])
 
@@ -327,6 +329,9 @@ class BSRNN(nn.Module):
 
         mask_estimations = mask_estimations.permute((0, 2, 1))
 
+        rem              = mask_estimations[:, 1::2, :]
+        mask_estimations = mask_estimations[:,  ::2, :]
+
         pshape("Final mask is", mask_estimations.shape)
         pshape("x is ", x.shape)
 
@@ -334,7 +339,7 @@ class BSRNN(nn.Module):
             # mask is [1 ; freqs], switch it to [freqs] to allow broadcasting
             mask_estimations = mask_estimations.squeeze(0)
 
-        x = x * mask_estimations
+        x = x * mask_estimations + rem
 
         return x
 
@@ -386,6 +391,9 @@ class BSRNN(nn.Module):
             mask_estimations.append(band)
         mask_estimations = torch.cat(mask_estimations, 1)
 
+        rem              = mask_estimations[:, 1::2]
+        mask_estimations = mask_estimations[:,  ::2]
+
         pshape("Final mask is", mask_estimations.shape)
         pshape("x is ", x.shape)
 
@@ -393,6 +401,6 @@ class BSRNN(nn.Module):
             # mask is [1 ; freqs], switch it to [freqs] to allow broadcasting
             mask_estimations = mask_estimations.squeeze(0)
 
-        x = x * mask_estimations
+        x = x * mask_estimations + rem
 
         return x, new_state
