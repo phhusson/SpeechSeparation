@@ -8,6 +8,7 @@ import argparse
 import sys
 
 from bsrnn import BSRNN
+from bsrnn import Discriminator
 from m_dataset import samples, MyDataSet, train_infer
 
 parser = argparse.ArgumentParser(description='Train a BSRNN model')
@@ -29,6 +30,8 @@ def main():
     torch.multiprocessing.set_start_method('spawn')
 
     model = BSRNN().to("cuda")
+    discriminator = Discriminator().to("cuda")
+    discriminator.load_state_dict(torch.load("discriminator.pth"))
     if args.dump_graph:
         from torchview import draw_graph
         model = model.to('meta')
@@ -72,7 +75,7 @@ def main():
         epochLoss = 0.0
         epochSdr = 0.0
         for sample in tqdm(train_loader):
-            loss, sdr = train_infer(model, sample, l1loss)
+            loss, sdr = train_infer(model, discriminator, sample, l1loss)
 
             batchI += 1
             if args.loss_sdr:
@@ -104,7 +107,7 @@ def main():
             valLoss = 0.0
             valSdr = 0.0
             for sample in val_loader:
-                loss, sdr = train_infer(model, sample, l1loss)
+                loss, sdr = train_infer(model, None, sample, l1loss)
                 valLoss += loss.item()
                 valSdr += sdr.item()
 

@@ -52,12 +52,18 @@ def infer(model, sample):
     waveform_speech = waveform_speech[:, :x_time.shape[1]]
     return x, x_time, waveform_speech_freq, waveform_speech
 
-def train_infer(model, sample, lossfn, verbose=False):
+def train_infer(model, discriminator, sample, lossfn, verbose=False):
     x_freq, x_time, waveform_speech_freq, waveform_speech_time = infer(model, sample)
 
+    x_freq2 = torch.cat((x_freq.real, x_freq.imag), dim=1)
+    if discriminator:
+        with torch.no_grad():
+            discriminator_score = discriminator(x_freq2)
+    else:
+        discriminator_score = 0
     loss = (lossfn(x_time, waveform_speech_time) +
             lossfn(x_freq.real, waveform_speech_freq.real) +
-            lossfn(x_freq.imag, waveform_speech_freq.imag))
+            lossfn(x_freq.imag, waveform_speech_freq.imag)) + discriminator_score
     n2Source = torch.sum(torch.square(waveform_speech_time), dim=1)
     n2Delta = torch.sum(torch.square(x_time - waveform_speech_time), dim=1)
     sdr = 10 * torch.log10(n2Source / n2Delta)

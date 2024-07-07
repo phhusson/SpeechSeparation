@@ -395,6 +395,32 @@ class BSRNN(nn.Module):
             # mask is [1 ; freqs], switch it to [freqs] to allow broadcasting
             mask_estimations = mask_estimations.squeeze(0)
 
-        x = x * mask_estimations + rem
+        x = x * mask_estimations
 
         return x, new_state
+
+class Discriminator(nn.Module):
+    def __init__(self):
+        super(Discriminator, self).__init__()
+        self.layers = nn.Sequential(
+    # Input `x` of this function is [2; F * 2; T/512] where F is the number of frequencies,
+            nn.Conv1d(2049 * 2, 1024, 16, stride = 3),
+            nn.LeakyReLU(),
+            nn.Conv1d(1024, 128, 16, stride = 3),
+            nn.LeakyReLU(),
+            nn.Conv1d(128, 64, 16, stride = 3),
+            nn.LeakyReLU(),
+            nn.Conv1d(64, 32, 16, stride = 3),
+        )
+        self.layers2 = nn.Sequential(
+            nn.Linear(32, 1),
+            nn.Sigmoid()
+        )
+
+    # Input `x` of this function is [2; F * 2; T/512] where F is the number of frequencies,
+    def forward(self, x):
+        out = self.layers(x)
+        out = out.mean(dim = 2)
+        out = out.mean(dim = 0)
+        out = self.layers2(out)
+        return out
