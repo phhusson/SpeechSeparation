@@ -19,7 +19,13 @@ parser.add_argument('--resume', action='store_true', help='Reload model')
 parser.add_argument('--loss_sdr', action='store_true', help='Use SDR as loss')
 args = parser.parse_args()
 
+batch_size = 1
+if args.batch_size:
+    batch_size = args.batch_size
+batch_size_f = batch_size
+
 def main():
+    global batch_size, batch_size_f
     torch.multiprocessing.set_start_method('spawn')
 
     model = BSRNN().to("cuda")
@@ -40,7 +46,7 @@ def main():
         model.load_state_dict(torch.load("model.pth"))
 
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=2, factor=0.5)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=25, factor=0.4)
     l1loss = torch.nn.L1Loss(reduction='mean')
 
     train = samples(args.datapath, 'tr', with_s2s = True)
@@ -58,7 +64,7 @@ def main():
     val_loader = DataLoader(val, batch_size=1, shuffle=True, num_workers=2)
 
     epochI = 0
-    best = 0
+    best = 1.0e30
     while True:
         print("Epoch", epochI)
         batchI = 0
@@ -77,11 +83,11 @@ def main():
             epochLoss += loss.item()
             epochSdr += sdr.item()
 
-            if args.batch_size == 1:
+            if batch_size == 1:
                 optimizer.step()
                 optimizer.zero_grad()
             else:
-                if batchI % args.batch_size == 0:
+                if batchI % batch_size == 0:
                     optimizer.step()
                     optimizer.zero_grad()
 
@@ -104,9 +110,17 @@ def main():
 
             print("Validation Loss", valLoss / len(val), "Validation SDR", valSdr / len(val))
             wandb.log({"val_loss": valLoss / len(val), "val_sdr": valSdr / len(val)})
-            if valLoss > best:
+            if valLoss < best:
+                print("...Saving")
                 best = valLoss
                 torch.save(model.state_dict(), "model.pth")
+                torch.save(optimizer.state_dict(), "optimizer.pth")
+            else:
+                batch_size_f *= 1.05
+                if batch_size_f > batchI:
+                    batch_size_f = batchI
+                batch_size = int(batch_size_f)
+                print("Setting batch size to", batch_size)
 
         model.train()
 
