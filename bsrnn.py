@@ -23,6 +23,15 @@ class XXCInstanceNorm1d(nn.Module):
         out = out.reshape(x.shape)
         return out
 
+class Residual(nn.Module):
+    def __init__(self, *args):
+        super(Residual, self).__init__()
+        self.layers = nn.Sequential(*args)
+
+    def forward(self, x):
+        out = self.layers(x)
+        return out + x
+
 band_features = 64
 merge_channels = True
 # Takes as input [C; A; B] and outputs [C; A; B]; where C are ignored, A is
@@ -155,18 +164,21 @@ class BandwiseConv(nn.Module):
         super(BandwiseConv, self).__init__()
         self.nBands = len(generate_bandsplits())
         self.layers = nn.Sequential(
-            XXCInstanceNorm1d(self.nBands),
-            nn.Conv1d(band_features, band_features, 3, stride = 1, padding = 'same'),
-            nn.LeakyReLU(),
-            nn.Conv1d(band_features, band_features, 3, stride = 1, padding = 'same'),
-            nn.LeakyReLU(),
-            nn.Conv1d(band_features, band_features, 3, stride = 1, padding = 'same'),
-            nn.LeakyReLU(),
-            nn.Conv1d(band_features, band_features, 3, stride = 1, padding = 'same'),
-            nn.LeakyReLU(),
-            nn.Conv1d(band_features, band_features, 3, stride = 1, padding = 'same'),
-            nn.LeakyReLU(),
-            nn.Conv1d(band_features, band_features, 3, stride = 1, padding = 'same')
+            Residual(
+                nn.Conv1d(band_features, band_features, 3, stride = 1, padding = 'same'),
+                nn.LeakyReLU()
+            ),
+            Residual(
+                nn.Conv1d(band_features, band_features, 3, stride = 1, padding = 'same'),
+                nn.LeakyReLU()
+            ),
+            Residual(
+                nn.Conv1d(band_features, band_features, 3, stride = 1, padding = 'same'),
+                nn.LeakyReLU(),
+            ),
+            Residual(
+                nn.Conv1d(band_features, band_features, 3, stride = 1, padding = 'same')
+            )
         )
 
     def forward(self, x: torch.Tensor):
