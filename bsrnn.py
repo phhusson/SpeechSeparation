@@ -106,9 +106,17 @@ class BandwiseLSTM(nn.Module):
         self.m = NormRNNResidual(bidirectional = True)
 
     def forward(self, x: torch.Tensor):
-        # X is [2; T; nBands; 128], we need [2 * T ; nBands; 128]
         nChannels = x.shape[0]
-        x = x.reshape((nChannels * x.shape[1], x.shape[2], x.shape[3]))
+        nTimesteps = x.shape[1]
+        nBands = x.shape[2]
+
+        # X is [2; T; nBands; 128], we need [2 * T ; nBands * 128]
+        x = x.reshape((nChannels * nTimesteps, nBands * band_features))
+        norm = torch.norm(x, dim = 1).unsqueeze(1)
+        x = x / norm
+
+        # X is [2; T; nBands; 128], we need [2 * T ; nBands; 128]
+        x = x.reshape((nChannels * nTimesteps, nBands, band_features))
 
         out = self.m(x)
         # out is [2 * T; nBands; 128]
@@ -117,6 +125,14 @@ class BandwiseLSTM(nn.Module):
         return out
 
     def forward_recurrent(self, x):
+        nChannels = x.shape[0]
+        nBands = x.shape[1]
+        # X is [2; nBands; 128] we want [2; nBands * 128]
+        x = x.reshape((nChannels, nBands * band_features))
+        norm = torch.norm(x, dim = 1).unsqueeze(1)
+        x = x / norm
+        x = x.reshape( (nChannels, nBands, band_features))
+
         return self.m(x)
 
 class BandwiseFC(nn.Module):
