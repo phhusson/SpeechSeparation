@@ -15,7 +15,8 @@ parser.add_argument("--output", type=str, help="Output file")
 args = parser.parse_args()
 
 model = BSRNN().to("cpu")
-model.load_state_dict(torch.load("model.pth"))
+#model.load_state_dict(torch.load("model.pth"))
+model.load_state_dict(torch.load("model-always.pth"))
 model.eval()
 #torch.onnx.dynamo_export(model, torch.ones([2, 2049, 512]))
 #torch.onnx.export(model, torch.ones([2, 2049, 512], dtype = torch.complex64), "hello.onnx", opset_version=15)
@@ -25,23 +26,20 @@ waveform = waveform.to("cpu")
 if waveform.shape[0] == 1:
     waveform = torch.cat((waveform, waveform), 0)
 
-stft_window = torch.hann_window(4096).to("cpu")
+stft_window = torch.hann_window(2048).to("cpu")
 orig_peak = waveform.max().item()
-x = torch.stft(waveform, n_fft=4096, hop_length=512, return_complex=True, window=stft_window)
+x = torch.stft(waveform, n_fft=2048, hop_length=1024, return_complex=True, window=stft_window)
 x = torch.stack((x.real, x.imag), dim=2)
 x = x.reshape( (x.shape[0], x.shape[1] * 2, x.shape[3]))
 x = model.forward(x)
 x = x.reshape((2, -1, 2, x.shape[2]))
 x = torch.complex(x[:, :, 0, :], x[:, :, 1, :])
-x = torch.istft(x, n_fft=4096, hop_length=512, window=stft_window)
+x = torch.istft(x, n_fft=2048, hop_length=1024, window=stft_window)
 
 x = x.cpu()
 waveform = waveform.cpu()
 waveform = waveform[:,:x.shape[1]]
 torchaudio.save(args.output, x, sr)
-
-aaa, sr = torchaudio.load("/home/phh/d/d/d4/dnr_v2/tt/10020/speech.wav")
-torchaudio.save("delta-" + args.output, (waveform - x), sr)
 
 signalPower = np.sum(np.square(waveform.numpy()))
 remainingPower = np.sum(np.square((waveform - x).numpy()))
