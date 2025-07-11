@@ -10,10 +10,10 @@ def samples(sample_bases, folder, with_s2s = False, with_rnnoise = False):
     # Filter out files
     sdirs = [x for x in s if os.path.isdir(x)]
     #s = [(x + '/mix.wav', x + '/speech_post_rnnoise.wav') for x in sdirs]
-    speech = "/speech.wav"
+    speech = "/speech.flac"
     if with_rnnoise:
         speech = "/speech_post_rnnoise.wav"
-    s = [(x + '/mix.wav', x + speech) for x in sdirs]
+    s = [(x + '/mixture.flac', x + speech) for x in sdirs]
     if with_s2s:
         s += [(x + speech,  x + speech) for x in sdirs]
     return s
@@ -40,15 +40,15 @@ def mix_samples(base):
             #    dialogs += [p]
             if 'lownoise' in p and p.endswith(".wav"):
                 dialogs += [p]
-            elif x.startswith('speech.wav'):
+            elif x.startswith('speech.wav') or x.startswith('speech.flac'):
                 dialogs += [p]
             elif x.startswith('speech_post_rnnoise.wav'):
                 dialogs += [p]
             #if x.startswith('background-'):
             #    backgrounds += [p]
-            elif x.startswith('sfx.wav'):
+            elif x.startswith('sfx.wav') or x.startswith('sfx.flac') or x.startswith('sfx_bg.flac') or x.startswith('sfx_fg.flac'):
                 backgrounds += [p]
-            elif x.startswith('music.wav'):
+            elif x.startswith('music.wav') or x.startswith('music.flac'):
                 backgrounds += [p]
             elif x.startswith('vocalnoise') and endswith('.wav'):
                 backgrounds += [p]
@@ -67,11 +67,11 @@ def load_waveform_cpu(path):
     return waveform
 
 class MyDataSet(torch.utils.data.Dataset):
-    def __init__(self, s, train = False):
+    def __init__(self, s, with_rir = False):
         self.samples = s
-        self.train = train
+        self.with_rir = with_rir
         self.resampler = torchaudio.transforms.Resample(16000, 44100).to('cuda')
-        if train:
+        if with_rir:
             rir_base = "/nvme1/ML/DnR/RIRS_NOISES/real_rirs_isotropic_noises"
             self.rirs = [rir_base + '/' + x for x in os.listdir(rir_base) if "imp" in x]
 
@@ -90,7 +90,7 @@ class MyDataSet(torch.utils.data.Dataset):
         a = load_waveform(srcf)
 
         # Randomly apply a RIR
-        if self.train:
+        if self.with_rir:
             # 10% chance of applying a rir
             res = random.choices([True, False], weights=[0.1, 0.9])[0]
             if res:

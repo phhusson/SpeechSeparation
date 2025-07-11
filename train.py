@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import torch
+import random
 from tqdm import tqdm
 from torch.utils.data import DataLoader
 import wandb
@@ -53,11 +54,12 @@ def main():
     l1loss = torch.nn.L1Loss(reduction='mean')
 
     # Train is dnr dataset
-    if False:
-        train = samples(args.datapath, 'tr', with_s2s = False, with_rnnoise = True)
+    if True:
+        train = samples(args.datapath, 'train', with_s2s = False, with_rnnoise = False)
         if args.mini:
+            random.shuffle(train)
             train = train[:10]
-        train = MyDataSet(train, train = True)
+        train = MyDataSet(train, with_rir = False)
     # Train is remixed samples, of dnr + other sources
     else:
         trains = [
@@ -69,15 +71,15 @@ def main():
         train = (sum([x[0][0] * x[1] for x in trains], []), sum([x[0][1] * x[1] for x in trains], []))
         train = MixDataSet(train)
 
-    val = samples(args.datapath, 'cv')
-    val2 = samples(args.datapath, 'cv', with_rnnoise = True)
+    val = samples(args.datapath, 'val')
+    val2 = samples(args.datapath, 'val', with_rnnoise = False)
     if args.mini:
         val = val[:10]
         val2 = val2[:10]
     val = MyDataSet(val)
     val2 = MyDataSet(val2)
-    test = samples(args.datapath, 'tt')
-    test = MyDataSet(test)
+    #test = samples(args.datapath, 'test')
+    #test = MyDataSet(test)
 
     train_loader = DataLoader(train, batch_size=1, shuffle=True, num_workers=8)
     val_loader = DataLoader(val, batch_size=1, shuffle=True, num_workers=2)
