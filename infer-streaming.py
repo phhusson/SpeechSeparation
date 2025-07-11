@@ -92,6 +92,14 @@ state = torch.zeros((4, 2, 24, 64))
 # the 512 off 512 of current-2, etc
 previous_speech = [torch.zeros( (2, fft_window))] * 8
 
+cuda = True
+if cuda:
+    stft_window = stft_window.to('cuda')
+    model = model.to('cuda')
+    state = state.to('cuda')
+    current_waveform = current_waveform.to('cuda')
+    previous_speech = [x.to('cuda') for x in previous_speech ]
+
 t = time.time()
 for chunks in streamer.stream():
 
@@ -103,6 +111,8 @@ for chunks in streamer.stream():
     if waveform.shape[0] == 1:
         waveform = torch.cat((waveform, waveform), 0)
 
+    if cuda:
+        waveform = waveform.to('cuda')
     waveform = torch.cat( (current_waveform[:,1024:], waveform), 1)
     current_waveform = waveform
 
@@ -122,6 +132,9 @@ for chunks in streamer.stream():
     ]
     sum_of_window = torch.zeros( 1024 )
     new_samples = torch.zeros( (2, 1024) )
+    if cuda:
+        sum_of_window = sum_of_window.to('cuda')
+        new_samples = new_samples.to('cuda')
     current_range = (0, 1024)
     for wf in previous_speech:
         win = stft_window[current_range[0]:current_range[1]]
@@ -131,6 +144,6 @@ for chunks in streamer.stream():
 
     new_samples = new_samples / sum_of_window
 
-    writer.write_audio_chunk(0, new_samples.permute( (1,0)) )
+    writer.write_audio_chunk(0, new_samples.permute( (1,0)).to('cpu') )
 
 print(f"Elapsed {time.time() - t}")
